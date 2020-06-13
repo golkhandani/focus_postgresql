@@ -752,3 +752,146 @@ comparison_operator ALL (subquery)
 6. `column_name != ALL (subquery)` the expression evaluates to true if a value is `not equal to any` value returned by the subquery.
 
 ## 8. Common Table Expressions
+Common Table Expressions are temporary in the sense that they only exist during the execution of the query.
+```sql
+WITH cte_name (column_list) AS (
+    CTE_query_definition 
+)
+statement;
+```
+> Common Table Expressions or CTEs are typically used to simplify complex joins and subqueries in PostgreSQL.
+
+For example:
+```sql
+WITH cte_film AS (
+    SELECT 
+        film_id, 
+        title,
+        (CASE 
+            WHEN length < 30 THEN 'Short'
+            WHEN length < 90 THEN 'Medium'
+            ELSE 'Long'
+        END) AS length    
+    FROM
+        film
+)
+SELECT
+    film_id,
+    title,
+    length
+FROM 
+    cte_film
+WHERE
+    length = 'Long'
+ORDER BY 
+    title; 
+```
+OR 
+```sql
+WITH cte_rental AS (
+    SELECT staff_id,
+        COUNT(rental_id) rental_count
+    FROM   rental
+    GROUP  BY staff_id
+)
+SELECT s.staff_id,
+    first_name,
+    last_name,
+    rental_count
+FROM staff s
+    INNER JOIN cte_rental USING (staff_id); 
+```
+### PostgreSQL CTE advantages
+- Improve the readability of complex queries. You use CTEs to organize complex queries in a more organized and readable manner.
+
+- Ability to create recursive queries. Recursive queries are queries that reference themselves. The recursive queries come in handy when you want to query hierarchical data such as organization chart or bill of materials.
+
+- Use in conjunction with window functions. You can use CTEs in conjunction with window functions to create an initial result set and use another select statement to further process this result set
+
+### PostgreSQL recursive query
+Structure: 
+```sql
+WITH RECURSIVE cte_name AS(
+    Non-recursive_CTE_query_definition -- Non-recursive term: the non-recursive term is a CTE query definition that forms the base result set of the CTE structure.
+    UNION [ALL]
+    Recursive_CTE_query_definition  -- Recursive term: the recursive term is one or more CTE query definitions joined with the non-recursive term using the UNION or UNION ALL operator. The recursive term references the CTE name itself.
+) SELECT * FROM cte_name;
+```
+1. Execute the non-recursive term to create the base result set (R0).
+2. Execute recursive term with Ri as an input to return the result set Ri+1 as the output.
+3. Repeat step 2 until an empty set is returned. (termination check)
+4. Return the final result set that is a UNION or UNION ALL of the result set R0, R1, … Rn
+Example: 
+```sql 
+CREATE TABLE employees (
+	employee_id serial PRIMARY KEY,
+	full_name VARCHAR NOT NULL,
+	manager_id INT
+);
+WITH RECURSIVE subordinates AS (
+	SELECT
+		employee_id,
+		manager_id,
+		full_name
+	FROM
+		employees
+	WHERE
+		employee_id = 2
+	UNION
+		SELECT
+			e.employee_id,
+			e.manager_id,
+			e.full_name
+		FROM
+			employees e
+		INNER JOIN subordinates s ON s.employee_id = e.manager_id
+) SELECT
+	*
+FROM
+	subordinates;
+```
+
+## 9. Modifying Data
+In this section, you will learn how to insert data into a table with the INSERT statement, modify existing data with the UPDATE statement, and remove data with the DELETE statement. Besides, you learn how to use the upsert statement to merge data.
+
+### 9.1 INSERT 
+```sql
+INSERT INTO table (column1, column2, …)
+VALUES
+	(value1, value2, …),
+	(value1, value2, …) ,...;
+[RETURNING id;]
+```
+### 9.2 UPDATE and UPDATE join
+```sql
+UPDATE table
+SET column1 = value1,
+    column2 = value2 ,...
+WHERE
+	condition;
+```
+```sql
+UPDATE A
+SET A.c1 = expression
+FROM B
+WHERE A.c2 = B.c2;
+```
+### 9.3 DELETE
+```sql
+DELETE FROM table
+WHERE condition;
+```
+or 
+```sql
+DELETE FROM table
+USING another_table
+WHERE table.id = another_table.id AND …
+```
+### 9.4 Upsert or INSERT ON CONFLICT 
+```sql
+INSERT INTO table_name(column_list) VALUES(value_list)
+ON CONFLICT {  ON CONSTRAINT constraint_name | target_name} `action`;
+```
+The `action` can be:
+- `DO NOTHING` – means do nothing if the row already exists in the table.
+- `DO UPDATE SET column_1 = value_1, .. WHERE condition` – update some fields in the table.
